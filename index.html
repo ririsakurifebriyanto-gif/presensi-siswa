@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+
+  <meta charset="UTF-8">
+
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1">
+
+  <title>Presensi Siswa</title>
+
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <style>
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      background: #f1f5f9;
+    }
+
+    .container {
+      max-width: 500px;
+      margin: auto;
+      background: white;
+      padding: 25px;
+      border-radius: 18px;
+      box-shadow: 0 5px 20px rgba(0,0,0,.12);
+    }
+
+    h1 {
+      text-align: center;
+      margin: 0;
+    }
+
+    .sekolah {
+      text-align: center;
+      color: #64748b;
+      margin: 8px 0 20px;
+    }
+
+    #reader {
+      width: 100%;
+    }
+
+    .hasil {
+      display: none;
+      margin-top: 20px;
+      padding: 20px;
+      border-radius: 15px;
+      background: #f0fdf4;
+      text-align: center;
+    }
+
+    .berhasil {
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    .nama {
+      font-size: 24px;
+      font-weight: bold;
+      margin: 12px 0;
+    }
+
+    .info {
+      margin: 6px 0;
+    }
+
+    #pesan {
+      text-align: center;
+      margin-top: 15px;
+      font-weight: bold;
+    }
+
+    .error {
+      color: #dc2626;
+    }
+
+    .success {
+      color: #15803d;
+    }
+
+  </style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+  <h1>Presensi Siswa</h1>
+
+  <div class="sekolah">
+    SDN 1 UJUNGGEBANG
+  </div>
+
+  <div id="reader"></div>
+
+  <div id="pesan"></div>
+
+  <div id="hasil" class="hasil">
+
+    <div class="berhasil">
+      ✓ PRESENSI BERHASIL
+    </div>
+
+    <div class="nama" id="nama">
+    </div>
+
+    <div class="info">
+      NIS: <span id="nis"></span>
+    </div>
+
+    <div class="info">
+      Kelas: <span id="kelas"></span>
+    </div>
+
+    <div class="info">
+      Jam: <span id="jam"></span>
+    </div>
+
+    <div class="info">
+      Status: <strong id="status"></strong>
+    </div>
+
+  </div>
+
+</div>
+
+
+<script>
+
+/*
+=====================================
+URL WEB APP GOOGLE APPS SCRIPT
+=====================================
+*/
+
+const APPS_SCRIPT_URL =
+https://script.google.com/macros/s/AKfycby-r0k4Vn7qwwzJ21go3_nXJBZ36w-Pw3gGmXGEEZH7Uzi-U15PgzvMvVF-B-dMc2Vu/exec;
+
+
+let scanner;
+let sedangScan = false;
+
+
+/*
+=====================================
+MULAI SCANNER
+=====================================
+*/
+
+function mulaiScanner() {
+
+  scanner = new Html5Qrcode("reader");
+
+  scanner.start(
+
+    {
+      facingMode: "environment"
+    },
+
+    {
+      fps: 10,
+
+      qrbox: {
+        width: 250,
+        height: 250
+      }
+
+    },
+
+    function(decodedText) {
+
+      if (sedangScan) return;
+
+      sedangScan = true;
+
+      const nis = decodedText.trim();
+
+      scanner.stop().then(function() {
+
+        kirimPresensi(nis);
+
+      });
+
+    },
+
+    function(errorMessage) {
+
+      // Error scan biasa diabaikan
+
+    }
+
+  )
+
+  .catch(function(error) {
+
+    tampilkanPesan(
+      "Kamera tidak dapat digunakan: " + error,
+      "error"
+    );
+
+  });
+
+}
+
+
+/*
+=====================================
+KIRIM NIS KE APPS SCRIPT
+=====================================
+*/
+
+function kirimPresensi(nis) {
+
+  tampilkanPesan(
+    "Memproses presensi...",
+    ""
+  );
+
+
+  const formData = new FormData();
+
+  formData.append(
+    "nis",
+    nis
+  );
+
+
+  fetch(APPS_SCRIPT_URL, {
+
+    method: "POST",
+
+    body: formData
+
+  })
+
+  .then(function(response) {
+
+    return response.json();
+
+  })
+
+  .then(function(data) {
+
+    if (data.status) {
+
+      document.getElementById("nis")
+        .textContent = data.nis;
+
+      document.getElementById("nama")
+        .textContent = data.nama;
+
+      document.getElementById("kelas")
+        .textContent = data.kelas;
+
+      document.getElementById("jam")
+        .textContent = data.jam;
+
+      document.getElementById("status")
+        .textContent = data.statusPresensi;
+
+
+      document.getElementById("hasil")
+        .style.display = "block";
+
+
+      tampilkanPesan(
+        data.message,
+        "success"
+      );
+
+
+      setTimeout(function() {
+
+        location.reload();
+
+      }, 3000);
+
+
+    } else {
+
+      tampilkanPesan(
+        data.message,
+        "error"
+      );
+
+
+      setTimeout(function() {
+
+        location.reload();
+
+      }, 2500);
+
+    }
+
+  })
+
+  .catch(function(error) {
+
+    tampilkanPesan(
+      "Gagal mengirim data: " +
+      error.message,
+      "error"
+    );
+
+    sedangScan = false;
+
+  });
+
+}
+
+
+/*
+=====================================
+TAMPILKAN PESAN
+=====================================
+*/
+
+function tampilkanPesan(teks, tipe) {
+
+  const pesan =
+    document.getElementById("pesan");
+
+  pesan.textContent = teks;
+
+  pesan.className = tipe;
+
+}
+
+
+/*
+=====================================
+JALANKAN
+=====================================
+*/
+
+window.onload = function() {
+
+  mulaiScanner();
+
+};
+
+</script>
+
+</body>
+
+</html>
