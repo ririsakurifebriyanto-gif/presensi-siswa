@@ -2,113 +2,353 @@
 <html lang="id">
 
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <title>Test Kamera Presensi</title>
+  <meta charset="UTF-8">
+
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1">
+
+  <title>Presensi Siswa</title>
+
+  <script src="https://unpkg.com/html5-qrcode"></script>
 
   <style>
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
-      font-family: Arial, sans-serif;
-      text-align: center;
+      margin: 0;
       padding: 20px;
-      background: #f5f5f5;
+      font-family: Arial, sans-serif;
+      background: #f1f5f9;
     }
 
-    video {
-      width: 100%;
+    .container {
       max-width: 500px;
-      border-radius: 15px;
-      margin-top: 20px;
-      background: #000;
+      margin: auto;
+      background: white;
+      padding: 25px;
+      border-radius: 18px;
+      box-shadow: 0 5px 20px rgba(0,0,0,.12);
     }
 
-    button {
-      padding: 14px 25px;
-      font-size: 18px;
-      border: none;
-      border-radius: 10px;
-      margin-top: 20px;
+    h1 {
+      text-align: center;
+      margin: 0;
+    }
+
+    .sekolah {
+      text-align: center;
+      color: #64748b;
+      margin: 8px 0 20px;
+    }
+
+    #reader {
+      width: 100%;
     }
 
     #pesan {
-      margin-top: 20px;
+      text-align: center;
+      margin-top: 15px;
       font-weight: bold;
     }
+
+    .hasil {
+      display: none;
+      margin-top: 20px;
+      padding: 20px;
+      border-radius: 15px;
+      background: #f0fdf4;
+      text-align: center;
+    }
+
+    .nama {
+      font-size: 24px;
+      font-weight: bold;
+      margin: 12px 0;
+    }
+
+    .info {
+      margin: 7px 0;
+    }
+
+    .success {
+      color: #15803d;
+    }
+
+    .error {
+      color: #dc2626;
+    }
+
   </style>
+
 </head>
 
 <body>
 
+<div class="container">
+
   <h1>Presensi Siswa</h1>
 
-  <p>SDN 1 UJUNGGEBANG</p>
+  <div class="sekolah">
+    SDN 1 UJUNGGEBANG
+  </div>
 
-  <button onclick="aktifkanKamera()">
-    📷 AKTIFKAN KAMERA
-  </button>
-
-  <br>
-
-  <video id="kamera" autoplay playsinline></video>
+  <div id="reader"></div>
 
   <div id="pesan">
-    Tekan tombol untuk mengaktifkan kamera.
+    Arahkan kamera ke QR Code siswa
   </div>
+
+  <div id="hasil" class="hasil">
+
+    <div>✓ PRESENSI BERHASIL</div>
+
+    <div class="nama" id="nama"></div>
+
+    <div class="info">
+      NIS: <span id="nis"></span>
+    </div>
+
+    <div class="info">
+      Kelas: <span id="kelas"></span>
+    </div>
+
+    <div class="info">
+      Jam: <span id="jam"></span>
+    </div>
+
+    <div class="info">
+      Status: <strong id="status"></strong>
+    </div>
+
+  </div>
+
+</div>
 
 
 <script>
 
-async function aktifkanKamera() {
+/* =================================
+   URL WEB APP APPS SCRIPT
+   ================================= */
+
+const APPS_SCRIPT_URL =
+https://script.google.com/macros/s/AKfycby-r0k4Vn7qwwzJ21go3_nXJBZ36w-Pw3gGmXGEEZH7Uzi-U15PgzvMvVF-B-dMc2Vu/exec;
+
+
+let scanner;
+
+
+/* =================================
+   MULAI SCANNER
+   ================================= */
+
+function mulaiScanner() {
+
+  scanner = new Html5Qrcode("reader");
+
+
+  scanner.start(
+
+    {
+      facingMode: "environment"
+    },
+
+    {
+      fps: 10,
+
+      qrbox: {
+        width: 250,
+        height: 250
+      }
+
+    },
+
+    function(decodedText) {
+
+      const nis = decodedText.trim();
+
+      console.log("QR terbaca:", nis);
+
+      prosesPresensi(nis);
+
+    },
+
+    function(errorMessage) {
+
+      // Kesalahan scan biasa diabaikan
+
+    }
+
+  )
+
+  .catch(function(error) {
+
+    tampilkanPesan(
+      "Kamera gagal dibuka: " + error,
+      "error"
+    );
+
+  });
+
+}
+
+
+/* =================================
+   KIRIM KE APPS SCRIPT
+   MENGGUNAKAN JSONP
+   ================================= */
+
+function prosesPresensi(nis) {
+
+  // Hentikan scanner sementara
+  scanner.stop()
+    .then(function() {
+
+      tampilkanPesan(
+        "Memproses presensi...",
+        ""
+      );
+
+
+      const callbackName =
+        "hasilPresensi_" +
+        Date.now();
+
+
+      window[callbackName] =
+        function(data) {
+
+          console.log(
+            "Balasan Apps Script:",
+            data
+          );
+
+
+          if (data.status) {
+
+            document.getElementById("nis")
+              .textContent = data.nis;
+
+            document.getElementById("nama")
+              .textContent = data.nama;
+
+            document.getElementById("kelas")
+              .textContent = data.kelas;
+
+            document.getElementById("jam")
+              .textContent = data.jam;
+
+            document.getElementById("status")
+              .textContent =
+                data.statusPresensi;
+
+
+            document.getElementById("hasil")
+              .style.display = "block";
+
+
+            tampilkanPesan(
+              "✓ " + data.message,
+              "success"
+            );
+
+
+            // Bersihkan callback
+            delete window[callbackName];
+
+
+            // Siapkan scanner lagi
+            setTimeout(function() {
+
+              location.reload();
+
+            }, 3000);
+
+
+          } else {
+
+            tampilkanPesan(
+              data.message,
+              "error"
+            );
+
+
+            delete window[callbackName];
+
+
+            setTimeout(function() {
+
+              location.reload();
+
+            }, 2500);
+
+          }
+
+        };
+
+
+      const script =
+        document.createElement("script");
+
+
+      script.src =
+        APPS_SCRIPT_URL +
+        "?nis=" +
+        encodeURIComponent(nis) +
+        "&callback=" +
+        encodeURIComponent(callbackName) +
+        "&t=" +
+        Date.now();
+
+
+      script.onerror = function() {
+
+        tampilkanPesan(
+          "Gagal terhubung ke Apps Script.",
+          "error"
+        );
+
+        delete window[callbackName];
+
+      };
+
+
+      document.body.appendChild(script);
+
+    });
+
+}
+
+
+/* =================================
+   PESAN
+   ================================= */
+
+function tampilkanPesan(teks, tipe) {
 
   const pesan =
     document.getElementById("pesan");
 
-  try {
+  pesan.textContent = teks;
 
-    if (!navigator.mediaDevices ||
-        !navigator.mediaDevices.getUserMedia) {
-
-      pesan.textContent =
-        "Browser tidak mendukung akses kamera.";
-
-      return;
-    }
-
-
-    const stream =
-      await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: {
-            ideal: "environment"
-          }
-        },
-        audio: false
-      });
-
-
-    document.getElementById("kamera")
-      .srcObject = stream;
-
-
-    pesan.textContent =
-      "✓ Kamera berhasil diaktifkan.";
-
-  }
-
-  catch (error) {
-
-    pesan.textContent =
-      "Gagal membuka kamera: " +
-      error.name +
-      " - " +
-      error.message;
-
-    console.error(error);
-
-  }
+  pesan.className = tipe;
 
 }
+
+
+/* =================================
+   JALANKAN
+   ================================= */
+
+window.onload = function() {
+
+  mulaiScanner();
+
+};
 
 </script>
 
